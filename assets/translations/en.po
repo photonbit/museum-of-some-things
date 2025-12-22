@@ -308,10 +308,10 @@ msgid "Featured Art Exhibits"
 msgstr "Featured Art Exhibits"
 
 msgid "People"
-msgstr "People"
+msgstr "Projects"
 
 msgid "Featured People Exhibits"
-msgstr "Featured People Exhibits"
+msgstr "Featured Projects"
 
 msgid "History"
 msgstr "History"

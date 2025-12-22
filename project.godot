@@ -10,11 +10,12 @@ config_version=5
 
 [application]
 
-config/name="Museum of All Things"
+config/name="Museum of Some Things"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.5")
 config/icon="res://icon.png"
 run/main_scene.meta_quest="uid://dyw0howbtdh86"
+moat/start_door="Cocina"
 
 [autoload]
 
@@ -34,6 +35,7 @@ GlobalGridAccess="*res://scenes/util/GlobalGridAccess.gd"
 CacheControl="*res://scenes/util/CacheControl.gd"
 MipmapThread="*res://scenes/util/MipmapThread.gd"
 LanguageManager="*res://scenes/util/LanguageManager.gd"
+PaintingWalk="*res://scenes/paint_walk/PaintingWalk.gd"
 
 [display]
 
