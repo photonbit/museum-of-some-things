@@ -1,16 +1,20 @@
-[gd_scene load_steps=6 format=3 uid="uid://5javxi3uy0ep"]
+[gd_scene load_steps=7 format=3 uid="uid://5javxi3uy0ep"]
 
 [ext_resource type="Script" uid="uid://b3ct4p6pgs3v2" path="res://scenes/Museum.gd" id="1_7pjtd"]
 [ext_resource type="PackedScene" uid="uid://u4b0awts0vdi" path="res://scenes/Lobby.tscn" id="3_exsdv"]
 [ext_resource type="PackedScene" uid="uid://b67kdt23qph25" path="res://scenes/AmbienceController.tscn" id="3_udk7u"]
 [ext_resource type="PackedScene" uid="uid://dcr63oanyv85b" path="res://scenes/MusicController.tscn" id="4_uv22m"]
 
+[sub_resource type="Sky" id="Sky_j612t"]
+
 [sub_resource type="Environment" id="Environment_g30yg"]
-background_mode = 1
+background_mode = 2
+background_color = Color(0.800839, 0.3600928, 0.18424484, 1)
+sky = SubResource("Sky_j612t")
 ambient_light_source = 2
 ambient_light_color = Color(1, 0.960784, 0.882353, 1)
 ambient_light_energy = 0.4
-ssr_enabled = true
+reflected_light_source = 1
 ssr_max_steps = 256
 ssr_fade_in = 0.522331
 ssr_depth_tolerance = 128.0
@@ -18,12 +22,10 @@ ssao_enabled = true
 sdfgi_use_occlusion = true
 sdfgi_read_sky_light = false
 sdfgi_cascades = 8
-sdfgi_max_distance = 3276.8
 sdfgi_energy = 0.5
 glow_bloom = 1.0
 glow_blend_mode = 0
 glow_hdr_scale = 0.19
-fog_enabled = true
 fog_mode = 1
 fog_light_color = Color(1, 1, 1, 1)
 fog_density = 1.0

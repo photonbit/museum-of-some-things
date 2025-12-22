@@ -40,10 +40,14 @@ var from_title: String:
 var from_pos
 var from_dir
 
+var _to_title: String = ""
 var to_title: String:
   get:
-    return to_sign.text
+    return _to_title
   set(v):
+    _to_title = v
+    # By default mirror the navigation title to the visible sign.
+    # Museum.gd may override to_sign.text with a custom label (alias).
     to_sign.text = v
 
 var to_pos
@@ -169,7 +173,7 @@ func init(grid, from_title, to_title, hall_start, hall_dir, _hall_type=[true, FL
   to_sign.position = Util.gridToWorld(hall_start - hall_dir * 0.60) - position
   to_sign.position -= hall_dir.rotated(Vector3.UP, PI / 2).normalized() * 1.5
   to_sign.rotation.y = Util.vecToRot(hall_dir)
-  to_sign.text = to_title
+  self.to_title = to_title
 
   entry_door.position = Util.gridToWorld(from_pos) - 1.9 * from_dir - position
   entry_door.rotation.y = Util.vecToRot(from_dir) + PI

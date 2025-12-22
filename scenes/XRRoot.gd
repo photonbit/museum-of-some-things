@@ -70,7 +70,7 @@ func _on_webxr_primary_changed(webxr_primary: int):
 
 var menu_active = false
 var by_button_pressed = false
-var movement_style = "teleportation"
+var movement_style = "direct"
 
 func _set_xr_movement_style(style):
   movement_style = style

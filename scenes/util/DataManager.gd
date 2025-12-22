@@ -12,6 +12,12 @@ var _fs_lock = Mutex.new()
 var _texture_load_thread_pool_size = 5
 var _texture_load_thread_pool = []
 
+# Safety cap for very large source images. Many phone photos are 8K+ on one
+# side and will easily exceed GPU texture limits or cause OOM on XR/mobile.
+# Images larger than this will be downscaled preserving aspect ratio.
+const MAX_TEXTURE_SIZE := 3072
+const DOWNSCALE_INTERPOLATION := Image.INTERPOLATE_LANCZOS
+
 # Called when the node enters the scene tree for the first time.
 func _ready():
   WorkQueue.setup_queue(TEXTURE_QUEUE, TEXTURE_FRAME_PACING)
@@ -50,11 +56,30 @@ func _texture_load_item():
 
   match item.type:
     "request":
+        # First, try loading as a Godot resource (remapped to .ctex in exports).
+        # This allows Web exports to use imported textures without bundling the original files.
+        if item.url.begins_with("res://") or item.url.begins_with("user://"):
+          var tex = load(item.url)
+          if tex is Texture2D:
+            _emit_image(item.url, tex, item.ctx)
+            return
+
         var data = _read_url(item.url)
 
         if data:
           _load_image(item.url, data, item.ctx)
         else:
+          # Local file support (no HTTP). Read bytes directly from res:// or user://
+          if item.url.begins_with("res://") or item.url.begins_with("user://"):
+            var f = FileAccess.open(item.url, FileAccess.READ)
+            if f:
+              var bytes = f.get_buffer(f.get_length())
+              f.close()
+              _load_image(item.url, bytes, item.ctx)
+              return
+            else:
+              push_error("failed to open local image ", item.url)
+
           var request_url = item.url
           request_url += ('&' if '?' in request_url else '?') + "origin=*"
 
@@ -76,19 +101,54 @@ func _texture_load_item():
 
       var fmt = _detect_image_type(data)
       var image = Image.new()
+      var loaded = false
       if fmt == "PNG":
-        image.load_png_from_buffer(data)
+        loaded = image.load_png_from_buffer(data) == OK
       elif fmt == "JPEG":
-        image.load_jpg_from_buffer(data)
+        loaded = image.load_jpg_from_buffer(data) == OK
       elif fmt == "SVG":
-        image.load_svg_from_buffer(data)
+        loaded = image.load_svg_from_buffer(data) == OK
       elif fmt == "WebP":
-        image.load_webp_from_buffer(data)
+        loaded = image.load_webp_from_buffer(data) == OK
       else:
+        # Fallback by file extension if header detection failed
+        var lower_url = str(item.url).to_lower()
+        if lower_url.ends_with(".jpg") or lower_url.ends_with(".jpeg"):
+          loaded = image.load_jpg_from_buffer(data) == OK
+          fmt = "JPEG" if loaded else fmt
+        elif lower_url.ends_with(".png"):
+          loaded = image.load_png_from_buffer(data) == OK
+          fmt = "PNG" if loaded else fmt
+        elif lower_url.ends_with(".webp"):
+          loaded = image.load_webp_from_buffer(data) == OK
+          fmt = "WebP" if loaded else fmt
+        elif lower_url.ends_with(".svg"):
+          loaded = image.load_svg_from_buffer(data) == OK
+          fmt = "SVG" if loaded else fmt
+
+      if not loaded:
+        push_error("[DataManager] Unknown/unsupported image format: " + str(item.url))
         return
 
-      if image.get_width() == 0:
+      if image.get_width() == 0 or image.get_height() == 0:
+        push_error("[DataManager] Decoded image has zero size: " + str(item.url))
         return
+
+      # Log and downscale oversized images to avoid GPU/memory issues
+      var w = image.get_width()
+      var h = image.get_height()
+      var max_dim = maxi(w, h)
+      if OS.is_debug_build():
+        print("[DataManager] Loaded ", fmt, " ", w, "x", h, " from ", item.url)
+      if max_dim > MAX_TEXTURE_SIZE:
+        var scale = float(MAX_TEXTURE_SIZE) / float(max_dim)
+        var new_w = int(floor(float(w) * scale))
+        var new_h = int(floor(float(h) * scale))
+        new_w = max(new_w, 1)
+        new_h = max(new_h, 1)
+        if OS.is_debug_build():
+          print("[DataManager] Downscaling to ", new_w, "x", new_h, " (limit ", MAX_TEXTURE_SIZE, ") for ", item.url)
+        image.resize(new_w, new_h, DOWNSCALE_INTERPOLATION)
 
       _generate_mipmaps(item.url, image, item.ctx)
 
