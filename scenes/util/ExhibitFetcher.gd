@@ -607,6 +607,10 @@ func fetch(titles, ctx):
             "extract": extract_text,
             "ordered_text": true,
         }
+        if fm.has("audio") and typeof(fm.audio) == TYPE_STRING:
+            var audio_path_rel := str(fm.audio).strip_edges()
+            if audio_path_rel != "":
+                result["audio"] = audio_path_rel
         if links.size() > 0:
             result["links"] = links
         _results[title] = result
