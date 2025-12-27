@@ -152,6 +152,29 @@ func _set_current_room_title(title):
         tween.set_trans(Tween.TRANS_LINEAR)
         tween.set_ease(Tween.EASE_IN_OUT)
 
+    # Apply ambience override rules for this room
+    _apply_room_audio_override_for(title)
+
+func _apply_room_audio_override_for(title: String) -> void:
+    var ac = get_node_or_null("AmbienceController")
+    if ac == null:
+        return
+    # Lobby always clears any override to resume default ambience
+    if title == "$Lobby":
+        if ac.has_method("clear_override"):
+            ac.call("clear_override", 0.5)
+        return
+    # Try to read exhibit-level audio from ExhibitFetcher results
+    var result = ExhibitFetcher.get_result(title)
+    if result and typeof(result) == TYPE_DICTIONARY and result.has("audio"):
+        var rel_path := str(result.audio)
+        if rel_path != "" and ac.has_method("play_override_from_content_path"):
+            ac.call("play_override_from_content_path", rel_path, true, 0.5)
+            return
+    # If no exhibit audio is defined, clear any previous override
+    if ac.has_method("clear_override"):
+        ac.call("clear_override", 0.5)
+
 func _place_player_in_front_of_plaque(title: String) -> bool:
     # Locate the lobby exit pointing to the given title and place the player
     # a short distance in front of its sign, facing toward it. Returns true
