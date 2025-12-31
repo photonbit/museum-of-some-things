@@ -63,7 +63,10 @@ extends Node3D
 
 ## Optional material overrides per logical material_type in the GeoJSON
 ## For example: { "paper": some_material, "wood": another_material }
-@export var material_map : Dictionary = {}
+@export var material_map : Dictionary = {
+    "paper": preload("res://assets/textures/white.tres"),
+    "wood": preload("res://assets/textures/wood.tres")
+}
 
 ## Parent nodes for spawned geometry; if null they default to self
 @export var areas_parent_path : NodePath
@@ -353,25 +356,47 @@ func _build_area(feature: Dictionary) -> void:
     var mesh_instance := MeshInstance3D.new()
     mesh_instance.mesh = mesh
 
-    # Simple material selection (v1) — prefer explicit map; otherwise use painting texture if available
+    # Simple material selection (v1) for regions:
+    # Materials should influence ONLY the normal map. Albedo should come from the painting texture.
+    # The lookup key defaults to "paper" (mapped to white.tres) when no material is specified.
     var applied_material := false
     var _mat_name := ""
     var mat_dict: Dictionary = properties.get("material", {})
     if typeof(mat_dict) == TYPE_DICTIONARY:
-        _mat_name = str(mat_dict.get("name", ""))
-    if _mat_name != "" and material_map.has(_mat_name):
-        var mat = material_map[_mat_name]
-        if mat is Material:
-            mesh_instance.set_surface_override_material(0, mat)
-            applied_material = true
+        _mat_name = str(mat_dict.get("name", "paper")).strip_edges()
 
-    if not applied_material and _painting_texture:
+    # Compose a material that keeps albedo from the painting but copies only the normal map from the selected material
+    var src_mat: Material = null
+    if material_map.has(_mat_name):
+        src_mat = material_map.get(_mat_name) as Material
+    if (src_mat is Material) or _painting_texture:
         var std := StandardMaterial3D.new()
-        std.albedo_texture = _painting_texture
+        # Albedo from painting if available
+        if _painting_texture:
+            std.albedo_texture = _painting_texture
+        # Copy normal mapping from provided material (if any)
+        if src_mat is StandardMaterial3D:
+            var src := src_mat as StandardMaterial3D
+            std.normal_enabled = src.normal_enabled
+            std.normal_texture = src.normal_texture
+            std.normal_scale = src.normal_scale
+        # Reasonable defaults for flat surfaces
         std.roughness = 1.0
         std.metallic = 0.0
         std.cull_mode = BaseMaterial3D.CULL_DISABLED
+        # Important: use the polygon UVs so albedo respects original image size; do NOT use triplanar
+        std.uv1_triplanar = false
         mesh_instance.set_surface_override_material(0, std)
+        applied_material = true
+
+    # Fallback: painting texture only
+    if not applied_material and _painting_texture:
+        var std_fallback := StandardMaterial3D.new()
+        std_fallback.albedo_texture = _painting_texture
+        std_fallback.roughness = 1.0
+        std_fallback.metallic = 0.0
+        std_fallback.cull_mode = BaseMaterial3D.CULL_DISABLED
+        mesh_instance.set_surface_override_material(0, std_fallback)
 
     _areas_parent.add_child(mesh_instance)
 
@@ -452,171 +477,97 @@ func _build_wall(feature: Dictionary) -> void:
     var props_any = feature.get("properties")
     var properties: Dictionary = props_any if typeof(props_any) == TYPE_DICTIONARY else {}
     var coords = geometry.get("coordinates", [])
-    if typeof(coords) != TYPE_ARRAY or len(coords) < 2:
+    if typeof(coords) != TYPE_ARRAY or coords.size() < 2:
         if debug_logging:
             push_warning("PaintingWorldLoader: wall feature missing coordinates")
         return
 
-    # v1 wall model
-    var height: float = 1.0
-    var thickness: float = 1.0
+    # Wall dimensions from properties.wall
     var wall_model: Dictionary = properties.get("wall", {})
+    var height: float = 2.5
+    var thickness: float = 0.2
     if typeof(wall_model) == TYPE_DICTIONARY:
-        height = float(wall_model.get("height", height))
-        thickness = float(wall_model.get("thickness", thickness))
-
-    if thickness <= 0.0 or height <= 0.0:
+        if wall_model.has("height"): height = float(wall_model.height)
+        if wall_model.has("thickness"): thickness = float(wall_model.thickness)
+    if height <= 0.0 or thickness <= 0.0:
         return
 
-    # Vertical offset should match the same logic used for areas.
-    var height_offset: float = 0.0
+    # Vertical offset consistent with areas
+    var height_offset := 0.0
     var surface_dict: Dictionary = properties.get("surface", {})
     if typeof(surface_dict) == TYPE_DICTIONARY:
-        height_offset += float(surface_dict.get("baseHeight", 0.0))
-    if typeof(wall_model) == TYPE_DICTIONARY:
-        height_offset += float(wall_model.get("baseHeight", 0.0))
+        height_offset = float(surface_dict.get("baseHeight", 0.0))
 
+    # Build curve from LineString using painting->world mapping
     var plan := _resolve_plan_for_feature(properties)
-
-    # Convert polyline (u,v) into world-space points (XZ) at base height
-    var path: PackedVector3Array = PackedVector3Array()
+    var curve := Curve3D.new()
     for p in coords:
-        if typeof(p) == TYPE_ARRAY and len(p) >= 2:
-            var u = float(p[0])
-            var v = float(p[1])
-            var wpos := _painting_to_world(u, v, plan)
-            wpos.y = base_height + height_offset
-            path.append(wpos)
+        if typeof(p) == TYPE_ARRAY and p.size() >= 2:
+            var u := float(p[0])
+            var v := float(p[1])
+            var world_pos: Vector3 = _painting_to_world(u, v, plan)
+            # Place at floor level; the polygon will extrude from Y=0..height
+            world_pos.y = base_height + height_offset
+            curve.add_point(world_pos)
 
-    if path.size() < 2:
+    if curve.point_count < 2:
         return
 
-    # Precompute cumulative length for UVs and tangents for normals
-    var cum_len: PackedFloat32Array = PackedFloat32Array()
-    cum_len.resize(path.size())
-    cum_len[0] = 0.0
-    var total_len: float = 0.0
-    for i in range(1, path.size()):
-        var seg = path[i] - path[i - 1]
-        seg.y = 0.0
-        var seg_len = seg.length()
-        total_len += seg_len
-        cum_len[i] = total_len
+    # Create or use parent for walls
+    var parent: Node3D = _walls_parent if _walls_parent != null else self
 
-    # Compute per-point horizontal normals (XZ) using averaged tangents
-    var normals: Array = [] # Array<Vector3>
-    normals.resize(path.size())
-    for i in range(path.size()):
-        var tangent := Vector3.ZERO
-        if i == 0:
-            tangent = (path[1] - path[0])
-        elif i == path.size() - 1:
-            tangent = (path[i] - path[i - 1])
-        else:
-            tangent = (path[i + 1] - path[i - 1]) * 0.5
-        tangent.y = 0.0
-        var tlen = tangent.length()
-        if tlen > 0.0:
-            tangent /= tlen
-        else:
-            tangent = Vector3(1, 0, 0)
-        # Left normal (rotate +90 degrees around Y): (-z, 0, x)
-        var n := Vector3(-tangent.z, 0.0, tangent.x).normalized()
-        normals[i] = n
+    # Create Path3D and assign curve
+    var path := Path3D.new()
+    path.curve = curve
+    parent.add_child(path)
 
-    var half_t: float = thickness * 0.5
+    # Create rectangular cross-section polygon (X = thickness, Y = height)
+    var poly := PackedVector2Array()
+    var half_t := thickness * 0.5
+    # We want the wall to sit on the ground, so Y from 0 to height
+    poly.append(Vector2(-half_t, 0.0))
+    poly.append(Vector2( half_t, 0.0))
+    poly.append(Vector2( half_t, height))
+    poly.append(Vector2(-half_t, height))
 
-    # Build mesh via SurfaceTool: triangles only (no indices) so we can use vertices for collision faces
-    var st := SurfaceTool.new()
-    st.begin(Mesh.PRIMITIVE_TRIANGLES)
+    var csg := CSGPolygon3D.new()
+    csg.mode = CSGPolygon3D.MODE_PATH
+    csg.polygon = poly
+    csg.use_collision = true
+    # Robust path settings to ensure visible output
+    # Sample the path at reasonable intervals (meters); join segments and orient section to path
+    csg.path_interval = 0.1
+    csg.path_joined = true
+    # Use enum value 2 (path-follow rotation) to match working example and Godot 4.5 API
+    # Older constant name PATH_ROTATION_ORIENTED is not available in 4.5
+    csg.path_rotation = 2
+    csg.path_simplify_angle = 0.0
+    # Match working reference setup for UVs and local orientation
+    csg.path_local = true
+    csg.path_continuous_u = true
+    csg.path_u_distance = 1.0
+    csg.visible = true
 
-    # Side panels (left and right)
-    for i in range(path.size() - 1):
-        var s0: float = (cum_len[i] / max(total_len, 0.0001))
-        var s1: float = (cum_len[i + 1] / max(total_len, 0.0001))
-
-        var n0: Vector3 = normals[i]
-        var n1: Vector3 = normals[i + 1]
-
-        var bl0 := path[i] + n0 * half_t
-        var br0 := path[i] - n0 * half_t
-        var bl1 := path[i + 1] + n1 * half_t
-        var br1 := path[i + 1] - n1 * half_t
-
-        var tl0 := bl0 + Vector3.UP * height
-        var tr0 := br0 + Vector3.UP * height
-        var tl1 := bl1 + Vector3.UP * height
-        var tr1 := br1 + Vector3.UP * height
-
-        # Left side (outward normal approx +n)
-        _st_add_quad(st, bl0, bl1, tl1, tl0, Vector2(s0, 0.0), Vector2(s1, 0.0), Vector2(s1, 1.0), Vector2(s0, 1.0), false)
-        # Right side (outward normal approx -n)
-        _st_add_quad(st, br0, tr0, tr1, br1, Vector2(s0, 0.0), Vector2(s0, 1.0), Vector2(s1, 1.0), Vector2(s1, 0.0), false)
-
-        # Top cap between left and right (front faces up when viewed from above)
-        _st_add_quad(st, tl0, tl1, tr1, tr0, Vector2(s0, 0.0), Vector2(s1, 0.0), Vector2(s1, 1.0), Vector2(s0, 1.0), false)
-        # Duplicate the top cap with reversed winding so the top is double-sided for rendering
-        # and provides upward-facing triangles for collision even if normals flip.
-        _st_add_quad(st, tl0, tl1, tr1, tr0, Vector2(s0, 0.0), Vector2(s1, 0.0), Vector2(s1, 1.0), Vector2(s0, 1.0), true)
-        # Bottom cap (optional underside)
-        _st_add_quad(st, br0, br1, bl1, bl0, Vector2(s0, 0.0), Vector2(s1, 0.0), Vector2(s1, 1.0), Vector2(s0, 1.0), false)
-
-        # End caps will be added at loop boundaries below
-
-        # For the very first segment, add start cap
-        if i == 0:
-            var s_bl0 := bl0
-            var s_br0 := br0
-            var s_tl0 := tl0
-            var s_tr0 := tr0
-            # Cap facing backward along -tangent; choose winding so normal points outward
-            _st_add_quad(st, s_bl0, s_tl0, s_tr0, s_br0, Vector2(0,0), Vector2(0,1), Vector2(1,1), Vector2(1,0), false)
-        # For the last segment, add end cap
-        if i == path.size() - 2:
-            var e_bl1 := bl1
-            var e_br1 := br1
-            var e_tl1 := tl1
-            var e_tr1 := tr1
-            _st_add_quad(st, e_br1, e_tr1, e_tl1, e_bl1, Vector2(0,0), Vector2(0,1), Vector2(1,1), Vector2(1,0), false)
-
-    # Finalize mesh
-    st.generate_normals()
-    var mesh := st.commit()
-    if mesh == null:
-        return
-
-    var mesh_instance := MeshInstance3D.new()
-    mesh_instance.mesh = mesh
-
-    # Apply material override if provided by properties -> material_map
+    # Apply material override if provided
     var _mat_name := ""
     var mat_dict: Dictionary = properties.get("material", {})
     if typeof(mat_dict) == TYPE_DICTIONARY:
-        _mat_name = str(mat_dict.get("name", ""))
-    if _mat_name != "" and material_map.has(_mat_name):
+        _mat_name = str(mat_dict.get("name", "wood"))
+    if material_map.has(_mat_name):
         var mat = material_map[_mat_name]
         if mat is Material:
-            mesh_instance.set_surface_override_material(0, mat)
-    else:
-        # Fallback material: neutral, double-sided to ensure the top is visible
-        var std := StandardMaterial3D.new()
-        std.roughness = 1.0
-        std.metallic = 0.0
-        std.cull_mode = BaseMaterial3D.CULL_DISABLED
-        mesh_instance.set_surface_override_material(0, std)
+            csg.material = mat
 
-    _walls_parent.add_child(mesh_instance)
-
-    # Collision: concave trimesh shape built from the entire mesh
-    var collider := StaticBody3D.new()
-    var shape := mesh.create_trimesh_shape()
-    var col_shape := CollisionShape3D.new()
-    col_shape.shape = shape
-    collider.add_child(col_shape)
-    _walls_parent.add_child(collider)
+    # Add CSG as a child of the Path3D, then set path_node to the Path3D via a NodePath
+    path.add_child(csg)
+    # CSGPolygon3D.path_node expects a NodePath, not a node instance
+    csg.path_node = csg.get_path_to(path)
+    # Ensure containers are visible
+    parent.visible = true
+    path.visible = true
 
     if debug_logging:
-        print("PaintingWorldLoader: built polyline wall with points=", path.size(), " length=", total_len, " h=", height, " t=", thickness)
+        print("PaintingWorldLoader: built CSG wall with ", curve.point_count, " points, h=", height, " t=", thickness)
 
 
 ## Map painting-local coordinates (u,v) to world XZ plane.
