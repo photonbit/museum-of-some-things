@@ -1,22 +1,22 @@
-[gd_resource type="Resource" script_class="LobbyData" load_steps=5 format=3 uid="uid://34yga2226k3j"]
+[gd_resource type="Resource" script_class="LobbyData" load_steps=5 format=3 uid="uid://twy41idauugq"]
 
-[ext_resource type="Script" uid="uid://bdc8jjijlgjox" path="res://resource_definitions/LobbyData.gd" id="1_3ssej"]
-[ext_resource type="Script" uid="uid://ch3nm32ndlrbh" path="res://resource_definitions/LobbyWing.gd" id="2_y4oc8"]
+[ext_resource type="Script" uid="uid://bdc8jjijlgjox" path="res://resource_definitions/LobbyData.gd" id="1_nmr1a"]
+[ext_resource type="Script" uid="uid://ch3nm32ndlrbh" path="res://resource_definitions/LobbyWing.gd" id="2_plan3"]
 
 [sub_resource type="Resource" id="Resource_pgwi2"]
-script = ExtResource("2_y4oc8")
+script = ExtResource("2_plan3")
 name = "Projects"
 corner_1 = Vector2(-68, -44)
 corner_2 = Vector2(-32, -8)
-exhibits = PackedStringArray("Crucible", "uMetric", "Museum of Some Things", "Technochaman", "Virtual walks", "Metadata expert", "Cocina", "Liberacion digital", "CV", "Fluffy things", "The cyborg library", "Temporal Hangover", "Pizarras", "Infinite", "Infinite", "Infinite", "Infinite", "Infinite")
+exhibits = PackedStringArray("Horno", "uMetric", "Museum of Some Things", "Technochaman", "Virtual walks", "Refinar_Metadatos", "Cocina", "Liberacion digital", "2025", "Fluffy things", "The cyborg library", "Temporal Hangover", "Pizarras", "Artesa", "Estructuras", "Tools", "Bitacora_Creativa", "Persona")
 
 [sub_resource type="Resource" id="Resource_ooopd"]
-script = ExtResource("2_y4oc8")
+script = ExtResource("2_plan3")
 name = "Knowledge"
 corner_1 = Vector2(32, -44)
 corner_2 = Vector2(68, -8)
-exhibits = PackedStringArray("Poetry", "Solid Geometry", "Layout", "Information Architecture", "Psychology", "Game Design", "Music", "Machine Learning", "Mathematics", "Geospatial Software Engineering", "Metadata", "Infinite", "Infinite", "Infinite", "Infinite", "Infinite", "Infinite", "Infinite")
+exhibits = PackedStringArray("Poetry", "Solid Geometry", "Layout", "Information Architecture", "Psychology", "Game Design", "Music", "Machine Learning", "Mathematics", "Geospatial Software Engineering", "Metadata", "Description Logics", "Teorema de Convolucion", "Cuestionarios", "Butoh", "Museology", "Teaching", "Learning")
 
 [resource]
-script = ExtResource("1_3ssej")
-wings = Array[ExtResource("2_y4oc8")]([SubResource("Resource_pgwi2"), SubResource("Resource_ooopd")])
+script = ExtResource("1_nmr1a")
+wings = Array[ExtResource("2_plan3")]([SubResource("Resource_pgwi2"), SubResource("Resource_ooopd")])
