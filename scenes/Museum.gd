@@ -45,6 +45,38 @@ func init(player):
          _place_player_in_front_of_plaque(desired_start)
     reset_to_lobby()
 
+func get_jump_catalog() -> Array:
+    # Build a simple catalog from the lobby exits. Each exit points to an exhibit title
+    # which our _place_player_in_front_of_plaque understands.
+    var entries: Array = []
+    var lobby = $Lobby
+    if not is_instance_valid(lobby):
+        return entries
+    if not lobby.has_method("get") and not lobby.has("exits"):
+        return entries
+    if not lobby.exits:
+        return entries
+    for exit in lobby.exits:
+        if exit == null:
+            continue
+        var title := str(exit.to_title)
+        if title == "":
+            continue
+        # Filter out any special/system doors like $Lobby
+        if title.begins_with("$"):
+            continue
+        var e := {
+            "id": title,
+            "label": title,
+            "class_name": "plaque",
+            "path": "",
+            # Use a signpost icon for plaques so the overlay shows 🪧 by default
+            "icon_key": "signpost-big",
+            "scene_hint": "Museum"
+        }
+        entries.append(e)
+    return entries
+
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
     $WorldEnvironment.environment.ssr_enabled = not _xr

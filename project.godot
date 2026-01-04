@@ -16,6 +16,7 @@ config/features=PackedStringArray("4.5")
 config/icon="res://icon.png"
 run/main_scene.meta_quest="uid://dyw0howbtdh86"
 moat/start_door="Cocina"
+moat/class_md_root="res://content/meta/classes"
 
 [autoload]
 

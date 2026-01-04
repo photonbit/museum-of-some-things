@@ -1,0 +1,83 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/CLICompletionOverlay.gd" id="1_j9s2l"]
+
+[node name="CLICompletionOverlay" type="CanvasLayer"]
+script = ExtResource("1_j9s2l")
+layer = 100
+
+[node name="TopBar" type="Panel" parent="."]
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 48.0
+grow_horizontal = 2
+
+[node name="HBox" type="HBoxContainer" parent="TopBar"]
+anchors_preset = 10
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
+alignment = 0
+offset_left = 8.0
+offset_right = -8.0
+offset_top = 8.0
+offset_bottom = -8.0
+
+[node name="PromptLabel" type="Label" parent="TopBar/HBox"]
+text = ">"
+
+[node name="Prompt" type="LineEdit" parent="TopBar/HBox"]
+size_flags_horizontal = 3
+placeholder_text = "Type to filter..."
+
+[node name="SuggestionsPanel" type="Panel" parent="."]
+anchors_preset = 10
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 48.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="SuggestionsPanel"]
+anchors_preset = 10
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+offset_left = 8.0
+offset_right = -8.0
+offset_top = 8.0
+offset_bottom = -8.0
+
+[node name="Suggestions" type="ItemList" parent="SuggestionsPanel/VBox"]
+size_flags_vertical = 3
+auto_height = false
+
+[node name="TreesPanel" type="Panel" parent="."]
+visible = false
+anchors_preset = 10
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 48.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="HSplit" type="HSplitContainer" parent="TreesPanel"]
+anchors_preset = 10
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+offset_left = 8.0
+offset_right = -8.0
+offset_top = 8.0
+offset_bottom = -8.0
+split_offset = 200
+
+[node name="Trees" type="ItemList" parent="TreesPanel/HSplit"]
+size_flags_horizontal = 3
+
+[node name="TreeResults" type="ItemList" parent="TreesPanel/HSplit"]
+size_flags_horizontal = 3

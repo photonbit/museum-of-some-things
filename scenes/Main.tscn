@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://bnnoct48gjtw6"]
+[gd_scene load_steps=11 format=3 uid="uid://bnnoct48gjtw6"]
 
 [ext_resource type="Script" uid="uid://ddt5ufmvickc2" path="res://scenes/Main.gd" id="1_d7g3n"]
 [ext_resource type="PackedScene" uid="uid://5javxi3uy0ep" path="res://scenes/Museum.tscn" id="1_ivvmh"]
@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://b575vo2u5rw0p" path="res://scenes/menu/PopupTerminalMenu.tscn" id="6_cjdwp"]
 [ext_resource type="PackedScene" uid="uid://btdrwyul4s0cv" path="res://scenes/CacheCleaner.tscn" id="7_lsl8e"]
 [ext_resource type="AudioStream" uid="uid://b1h0hsbf5yxji" path="res://assets/sound/UI/UI Game Launch Sting/Game Launch Sting.ogg" id="9_ketwq"]
+[ext_resource type="PackedScene" path="res://ui/CLICompletionOverlay.tscn" id="10_cliov"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_d7g3n")
@@ -69,6 +70,8 @@ transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 11.
 visible = false
 light_energy = 0.35
 sky_mode = 1
+
+[node name="CLICompletionOverlay" parent="." instance=ExtResource("10_cliov")]
 
 [connection signal="resume" from="CanvasLayer/Settings" to="." method="_on_settings_back"]
 [connection signal="settings" from="CanvasLayer/MainMenu" to="." method="_on_main_menu_settings"]
