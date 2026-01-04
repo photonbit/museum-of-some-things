@@ -24,6 +24,12 @@ var _joy_right_y = JOY_AXIS_RIGHT_Y
 @export var max_speed_dash = 10
 @export var max_speed = max_speed_walk
 
+# Tiptoe (inverse duck) parameters
+@export var tiptoe_offset := 0.25 # meters above standing eye height
+@export var tiptoe_time := 0.25   # seconds to reach full tiptoe
+var tiptoe_height := 0.0
+var tiptoe_speed := 0.0
+
 var _invert_y = false
 var _mouse_sensitivity_factor = 1.0
 
@@ -35,6 +41,8 @@ func _ready():
   starting_height = $Pivot.get_position().y
   crouching_height = starting_height / 3
   crouch_speed = (starting_height - crouching_height) / crouch_time
+  tiptoe_height = starting_height + tiptoe_offset
+  tiptoe_speed = (tiptoe_height - starting_height) / max(tiptoe_time, 0.001)
 
 func _set_invert_y(enabled):
   _invert_y = enabled
@@ -90,15 +98,15 @@ func _physics_process(delta):
 
   velocity.y += gravity * delta
 
-  var fully_crouched = $Pivot.get_position().y <= crouching_height
-  var fully_standing = $Pivot.get_position().y >= starting_height
-
-  if fully_standing and Input.is_action_pressed("dash"):
+  # Movement speed should depend on inputs, not current height.
+  # If crouch is held, always move at crouch speed. Otherwise, allow dash.
+  var crouching: bool = Input.is_action_pressed("crouch")
+  if Input.is_action_pressed("dash") and not crouching:
     max_speed = max_speed_dash
   else:
     max_speed = max_speed_walk
 
-  var speed = max_speed if fully_standing else crouch_move_speed
+  var speed = crouch_move_speed if crouching else max_speed
   var input = Input.get_vector("strafe_left", "strafe_right", "move_forward", "move_back")
   var desired_velocity = transform.basis * Vector3(input.x, 0, input.y) * speed
 
@@ -127,10 +135,23 @@ func _physics_process(delta):
     velocity.y = jump_impulse
     pass
 
-  if Input.is_action_pressed("crouch") and not fully_crouched:
-    $Pivot.global_translate(Vector3(0, -crouch_speed * delta, 0))
-  elif not Input.is_action_pressed("crouch") and not fully_standing:
-    $Pivot.global_translate(Vector3(0, crouch_speed * delta, 0))
+  # Height adjustment logic (crouch on CTRL, tiptoe on ALT)
+  # Priority: crouch overrides tiptoe if both are held.
+  # Use local position and move_toward to avoid oscillation/jitter.
+  var pivot_pos: Vector3 = $Pivot.position
+  var target_y: float = starting_height
+  if Input.is_action_pressed("crouch"):
+    target_y = crouching_height
+  elif Input.is_action_pressed("tiptoe"):
+    target_y = tiptoe_height
+
+  var current_y: float = pivot_pos.y
+  var epsilon := 0.001
+  if abs(current_y - target_y) > epsilon:
+    var dir_up := target_y > current_y
+    var height_speed: float = tiptoe_speed if dir_up else crouch_speed
+    pivot_pos.y = move_toward(current_y, target_y, height_speed * delta)
+    $Pivot.position = pivot_pos
 
   if Input.is_action_pressed("interact"):
     var collider = $Pivot/Camera3D/RayCast3D.get_collider()
